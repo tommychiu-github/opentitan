@@ -174,6 +174,28 @@ static status_t config_and_erase_certificate_flash_pages(void) {
   return OK_STATUS();
 }
 
+const ft_personalize_operations_t ft_ops[] = {
+    {OP_ID_WAIT_FOR_BOOTSTRAP, "Bootstrap requested."},
+    {OP_ID_WAIT_FOR_HOST_PUBLIC_KEY, "Waiting for host public key ..."},
+    {OP_ID_EXPORT_RMA_TOKEN, "Exporting RMA token ..."},
+    {OP_ID_WAIT_FOR_CERT_INPUTS, "Waiting for certificate inputs ..."},
+    {OP_ID_EXPORT_TBS_CERTS, "Exporting TBS certificates ..."},
+    {OP_ID_IMPORT_ENDORSED_CERTS, "Importing endorsed certificates ..."},
+    {OP_ID_FINISH_IMPORT_CERTS, "Finished importing certificates."},
+};
+
+char s[kMaxOpStringBytes];
+static void print_op_string(const enum operation_id id) {
+  for (size_t i = 0; i < ARRAYSIZE(ft_ops); i++) {
+    if (ft_ops[i].op_id == id) {
+      memset(s, 0, sizeof(s));
+      memcpy(s, ft_ops[i].op_string, sizeof(ft_ops[i].op_string));
+      LOG_INFO(s);
+      return;
+    }
+  }
+}
+
 /**
  * Provision OTP SECRET{1,2} partitions, keymgr flash info pages, enable flash
  * scrambling, and reboot.
@@ -187,14 +209,14 @@ static status_t personalize_otp_and_flash_secrets(ujson_t *uj) {
   if (!status_ok(manuf_individualize_device_creator_sw_cfg_check(&otp_ctrl))) {
     TRY(manuf_individualize_device_flash_data_default_cfg(&otp_ctrl));
     TRY(manuf_individualize_device_creator_sw_cfg_lock(&otp_ctrl));
-    LOG_INFO("Bootstrap requested.");
+    print_op_string(OP_ID_WAIT_FOR_BOOTSTRAP);
     wait_for_interrupt();
   }
 
   // Provision OTP Secret2 partition and flash info pages 1, 2, and 4 (keymgr
   // and DICE keygen seeds).
   if (!status_ok(manuf_personalize_device_secrets_check(&otp_ctrl))) {
-    LOG_INFO("Waiting for host public key ...");
+    print_op_string(OP_ID_WAIT_FOR_HOST_PUBLIC_KEY);
     TRY(ujson_deserialize_ecc_p256_public_key_t(uj, &host_ecc_pk));
     TRY(manuf_personalize_device_secrets(&flash_ctrl_state, &lc_ctrl, &otp_ctrl,
                                          &host_ecc_pk, &wrapped_rma_token));
@@ -214,7 +236,7 @@ static status_t personalize_otp_and_flash_secrets(ujson_t *uj) {
         &flash_ctrl_state, kFlashInfoFieldAttestationKeyGenVersion,
         /*data_in=*/&kKeyGenVersion, /*num_words=*/1,
         /*erase_page_before_write=*/false));
-    LOG_INFO("Exporting RMA token ...");
+    print_op_string(OP_ID_EXPORT_RMA_TOKEN);
     RESP_OK(ujson_serialize_wrapped_rma_unlock_token_t, uj, &wrapped_rma_token);
     sw_reset();
   }
@@ -347,7 +369,7 @@ static status_t personalize_gen_dice_certificates(ujson_t *uj) {
   // Retrieve certificate provisioning data.
   // DO NOT CHANGE THE BELOW STRING without modifying the host code in
   // sw/host/provisioning/ft_lib/src/lib.rs
-  LOG_INFO("Waiting for certificate inputs ...");
+  print_op_string(OP_ID_WAIT_FOR_CERT_INPUTS);
   TRY(ujson_deserialize_manuf_certgen_inputs_t(uj, &certgen_inputs));
   // We copy over the TPM/UDS endorsement key ID to an SHA256 digest type, since
   // this is the format of key IDs generated on-dice.
@@ -422,13 +444,13 @@ static status_t personalize_endorse_certificates(ujson_t *uj) {
   // Export the certificates to the provisioning appliance.
   // DO NOT CHANGE THE BELOW STRING without modifying the host code in
   // sw/host/provisioning/ft_lib/src/lib.rs
-  LOG_INFO("Exporting TBS certificates ...");
+  print_op_string(OP_ID_EXPORT_TBS_CERTS);
   RESP_OK(ujson_serialize_manuf_certs_t, uj, &tbs_certs);
 
   // Import endorsed certificates from the provisioning appliance.
   // DO NOT CHANGE THE BELOW STRING without modifying the host code in
   // sw/host/provisioning/ft_lib/src/lib.rs
-  LOG_INFO("Importing endorsed certificates ...");
+  print_op_string(OP_ID_IMPORT_ENDORSED_CERTS);
   TRY(ujson_deserialize_manuf_certs_t(uj, &endorsed_certs));
 
   /*****************************************************************************
@@ -512,7 +534,7 @@ static status_t personalize_endorse_certificates(ujson_t *uj) {
 
   // DO NOT CHANGE THE BELOW STRING without modifying the host code in
   // sw/host/provisioning/ft_lib/src/lib.rs
-  LOG_INFO("Finished importing certificates.");
+  print_op_string(OP_ID_FINISH_IMPORT_CERTS);
 
   return OK_STATUS();
 }

@@ -16,6 +16,23 @@
 
 #include "otp_ctrl_regs.h"  // Generated.
 
+enum operation_id {
+  OP_ID_WAIT_FOR_BOOTSTRAP = 0,
+  OP_ID_WAIT_FOR_HOST_PUBLIC_KEY,
+  OP_ID_EXPORT_RMA_TOKEN,
+  OP_ID_WAIT_FOR_CERT_INPUTS,
+  OP_ID_EXPORT_TBS_CERTS,
+  OP_ID_IMPORT_ENDORSED_CERTS,
+  OP_ID_FINISH_IMPORT_CERTS,
+  OP_ID_MAX,
+};
+
+#define kMaxOpStringBytes 40
+typedef struct {
+  const enum operation_id op_id;
+  const char op_string[kMaxOpStringBytes];
+} ft_personalize_operations_t;
+
 /**
  * Configures the SECRET1 OTP partition.
  *
